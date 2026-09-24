@@ -13,7 +13,7 @@ from .serializers import (
 )
 from .permissions import IsAdminApiKey
 from .pagination import DefaultLimitOffsetPagination
-from .kafka_utils import publish_order_shipped
+from .kafka_utils import publish_order_shipped, publish_order_refunded
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -65,13 +65,20 @@ class OrderViewSet(viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         new_status = serializer.validated_data['status']
+        reason = serializer.validated_data.get('reason')
 
         with transaction.atomic():
             instance.status = new_status
-            instance.save(update_fields=['status', 'updated_timestamp'])
+            update_fields = ['status', 'updated_timestamp']
+            if new_status == Order.STATUS_RETURN_REQUESTED:
+                instance.return_reason = reason
+                update_fields.append('return_reason')
+            instance.save(update_fields=update_fields)
 
         if new_status == Order.STATUS_SHIPPED:
             publish_order_shipped(instance)
+        elif new_status == Order.STATUS_REFUNDED:
+            publish_order_refunded(instance)
 
         return Response(OrderSerializer(instance).data)
 

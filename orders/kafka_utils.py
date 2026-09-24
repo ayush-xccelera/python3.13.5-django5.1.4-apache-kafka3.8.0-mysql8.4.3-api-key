@@ -46,3 +46,26 @@ def publish_order_shipped(order):
     except Exception as exc:  # pragma: no cover
         logger.warning("Failed to publish ORDER_SHIPPED event: %s", exc)
         return False
+
+
+def publish_order_refunded(order):
+    """Publish an ORDER_REFUNDED event to the order-events topic. Call only after commit."""
+    producer = _get_producer()
+    if producer is None:
+        logger.warning("Skipping ORDER_REFUNDED publish: no Kafka producer available.")
+        return False
+
+    payload = {
+        "event": "ORDER_REFUNDED",
+        "order_id": order.id,
+        "owning_client_id": order.owning_client_id,
+        "product_name": order.product_name,
+        "refund_timestamp": order.updated_timestamp.isoformat(),
+    }
+    try:
+        producer.send(settings.KAFKA_ORDER_EVENTS_TOPIC, value=payload)
+        producer.flush(timeout=5)
+        return True
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Failed to publish ORDER_REFUNDED event: %s", exc)
+        return False

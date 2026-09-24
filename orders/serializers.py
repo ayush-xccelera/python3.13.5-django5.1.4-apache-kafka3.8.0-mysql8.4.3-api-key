@@ -42,9 +42,9 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'product_name', 'quantity', 'total_amount', 'status',
-            'owning_client', 'created_timestamp', 'updated_timestamp',
+            'return_reason', 'owning_client', 'created_timestamp', 'updated_timestamp',
         ]
-        read_only_fields = ['id', 'status', 'owning_client', 'created_timestamp', 'updated_timestamp']
+        read_only_fields = ['id', 'status', 'return_reason', 'owning_client', 'created_timestamp', 'updated_timestamp']
 
     def validate_quantity(self, value):
         if value <= 0:
@@ -64,12 +64,15 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class OrderStatusUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Order.STATUS_CHOICES)
+    reason = serializers.CharField(required=False, allow_blank=True)
 
     ALLOWED_TRANSITIONS = {
         Order.STATUS_PENDING: [Order.STATUS_CONFIRMED, Order.STATUS_CANCELLED],
         Order.STATUS_CONFIRMED: [Order.STATUS_SHIPPED, Order.STATUS_CANCELLED],
         Order.STATUS_SHIPPED: [Order.STATUS_DELIVERED],
-        Order.STATUS_DELIVERED: [],
+        Order.STATUS_DELIVERED: [Order.STATUS_RETURN_REQUESTED],
+        Order.STATUS_RETURN_REQUESTED: [Order.STATUS_REFUNDED],
+        Order.STATUS_REFUNDED: [],
         Order.STATUS_CANCELLED: [],
     }
 
@@ -82,3 +85,12 @@ class OrderStatusUpdateSerializer(serializers.Serializer):
                     f"Invalid status transition from {order.status} to {value}."
                 )
         return value
+
+    def validate(self, attrs):
+        if attrs.get('status') == Order.STATUS_RETURN_REQUESTED:
+            reason = attrs.get('reason')
+            if not reason or not reason.strip():
+                raise serializers.ValidationError(
+                    {'reason': 'reason is required when requesting a return.'}
+                )
+        return attrs

@@ -21,6 +21,8 @@ class Order(models.Model):
     STATUS_CONFIRMED = 'CONFIRMED'
     STATUS_SHIPPED = 'SHIPPED'
     STATUS_DELIVERED = 'DELIVERED'
+    STATUS_RETURN_REQUESTED = 'RETURN_REQUESTED'
+    STATUS_REFUNDED = 'REFUNDED'
     STATUS_CANCELLED = 'CANCELLED'
 
     STATUS_CHOICES = [
@@ -28,6 +30,8 @@ class Order(models.Model):
         (STATUS_CONFIRMED, 'Confirmed'),
         (STATUS_SHIPPED, 'Shipped'),
         (STATUS_DELIVERED, 'Delivered'),
+        (STATUS_RETURN_REQUESTED, 'Return Requested'),
+        (STATUS_REFUNDED, 'Refunded'),
         (STATUS_CANCELLED, 'Cancelled'),
     ]
 
@@ -35,6 +39,7 @@ class Order(models.Model):
     quantity = models.PositiveIntegerField()
     total_amount = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    return_reason = models.CharField(max_length=500, null=True, blank=True)
     owning_client = models.ForeignKey(
         ApiKey, on_delete=models.CASCADE, related_name='orders'
     )

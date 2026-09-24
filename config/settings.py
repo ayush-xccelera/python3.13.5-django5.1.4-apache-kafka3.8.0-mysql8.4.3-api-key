@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-load_dotenv(BASE_DIR / '.env_37f2c7be-75bb-4cae-beb4-ce442a7fa284', override=True)
+load_dotenv(BASE_DIR / '.env_3e37c41e75831210', override=True)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-+5gjk6+*djxl^lqasb6h8h8qvtbm^)yr)z3&68+ed0z!wka%z0')

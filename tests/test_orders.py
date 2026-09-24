@@ -118,3 +118,87 @@ def test_delete_order_confirmed_rejected(api_client, auth_headers):
 def api_client2_headers(api_client, admin_headers):
     resp = api_client.post('/api/v1/api-keys/', {'name': 'Client Two'}, format='json', **admin_headers)
     return {'HTTP_X_API_KEY': resp.data['key']}
+
+
+def _make_delivered_order(api_client, auth_headers):
+    create_resp = api_client.post('/api/v1/orders/', ORDER_PAYLOAD, format='json', **auth_headers)
+    order_id = create_resp.data['id']
+    api_client.patch(f'/api/v1/orders/{order_id}/status/', {'status': 'CONFIRMED'}, format='json', **auth_headers)
+    api_client.patch(f'/api/v1/orders/{order_id}/status/', {'status': 'SHIPPED'}, format='json', **auth_headers)
+    api_client.patch(f'/api/v1/orders/{order_id}/status/', {'status': 'DELIVERED'}, format='json', **auth_headers)
+    return order_id
+
+
+@pytest.mark.django_db
+def test_return_requested_from_delivered_valid(api_client, auth_headers):
+    order_id = _make_delivered_order(api_client, auth_headers)
+    resp = api_client.patch(
+        f'/api/v1/orders/{order_id}/status/',
+        {'status': 'RETURN_REQUESTED', 'reason': 'Item defective'},
+        format='json', **auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.data['status'] == 'RETURN_REQUESTED'
+    assert resp.data['return_reason'] == 'Item defective'
+
+
+@pytest.mark.django_db
+def test_return_requested_missing_reason_400(api_client, auth_headers):
+    order_id = _make_delivered_order(api_client, auth_headers)
+    resp = api_client.patch(
+        f'/api/v1/orders/{order_id}/status/',
+        {'status': 'RETURN_REQUESTED'},
+        format='json', **auth_headers,
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.django_db
+def test_return_requested_empty_reason_400(api_client, auth_headers):
+    order_id = _make_delivered_order(api_client, auth_headers)
+    resp = api_client.patch(
+        f'/api/v1/orders/{order_id}/status/',
+        {'status': 'RETURN_REQUESTED', 'reason': '   '},
+        format='json', **auth_headers,
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.django_db
+def test_return_requested_from_non_delivered_invalid(api_client, auth_headers):
+    create_resp = api_client.post('/api/v1/orders/', ORDER_PAYLOAD, format='json', **auth_headers)
+    order_id = create_resp.data['id']
+    resp = api_client.patch(
+        f'/api/v1/orders/{order_id}/status/',
+        {'status': 'RETURN_REQUESTED', 'reason': 'Changed my mind'},
+        format='json', **auth_headers,
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.django_db
+def test_refunded_from_return_requested_valid(api_client, auth_headers):
+    order_id = _make_delivered_order(api_client, auth_headers)
+    api_client.patch(
+        f'/api/v1/orders/{order_id}/status/',
+        {'status': 'RETURN_REQUESTED', 'reason': 'Item defective'},
+        format='json', **auth_headers,
+    )
+    resp = api_client.patch(
+        f'/api/v1/orders/{order_id}/status/',
+        {'status': 'REFUNDED'},
+        format='json', **auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.data['status'] == 'REFUNDED'
+
+
+@pytest.mark.django_db
+def test_refunded_from_non_return_requested_invalid(api_client, auth_headers):
+    order_id = _make_delivered_order(api_client, auth_headers)
+    resp = api_client.patch(
+        f'/api/v1/orders/{order_id}/status/',
+        {'status': 'REFUNDED'},
+        format='json', **auth_headers,
+    )
+    assert resp.status_code == 400
